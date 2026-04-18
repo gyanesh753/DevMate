@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import ProjectCard from '../components/ProjectCard'
 
-function Home() {
+function Home({ newProject }) {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -18,6 +18,12 @@ function Home() {
         setLoading(false)
       })
   }, [])
+
+  useEffect(() => {
+    if (newProject) {
+      setProjects(prev => [newProject, ...prev])
+    }
+  }, [newProject])
 
   if (loading) return (
     <div className="text-center text-gray-400 py-20">Loading projects...</div>
