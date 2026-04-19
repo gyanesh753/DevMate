@@ -2,17 +2,39 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/index');
 
-// GET all projects
+// GET all projects with optional filters
 router.get('/', async (req, res) => {
   try {
+    const { type, experience_level, is_remote, search } = req.query
+
+    const typeVal = type && type !== 'all' ? type : null
+    const experienceVal =
+      experience_level && experience_level !== 'any' ? experience_level : null
+    const remoteVal =
+      is_remote !== undefined && is_remote !== ''
+        ? is_remote === 'true'
+        : null
+    const rawSearch = typeof search === 'string' ? search.trim() : ''
+    const searchVal = rawSearch.length > 0 ? rawSearch : null
+
     const result = await pool.query(
-      'SELECT * FROM projects ORDER BY created_at DESC'
-    );
-    res.json(result.rows);
+      `SELECT * FROM projects
+       WHERE ($1::text IS NULL OR type = $1)
+         AND ($2::text IS NULL OR experience_level = $2)
+         AND ($3::boolean IS NULL OR is_remote = $3)
+         AND (
+           $4::text IS NULL
+           OR title ILIKE ('%' || $4::text || '%')
+           OR description ILIKE ('%' || $4::text || '%')
+         )
+       ORDER BY created_at DESC`,
+      [typeVal, experienceVal, remoteVal, searchVal]
+    )
+    res.json(result.rows)
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message })
   }
-});
+})
 
 // GET single project by ID
 router.get('/:id', async (req, res) => {
