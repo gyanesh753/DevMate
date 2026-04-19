@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { Routes, Route } from 'react-router-dom'
 import { supabase } from './Supabase'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Auth from './pages/Auth'
 import PostProject from './pages/PostProject'
+import ProjectDetail from './pages/ProjectDetail'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -37,7 +39,10 @@ function App() {
         }}
       />
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <Home newProject={newProject} />
+        <Routes>
+          <Route path="/" element={<Home newProject={newProject} />} />
+          <Route path="/projects/:id" element={<ProjectDetail user={user} onSignInClick={() => setShowAuth(true)} />} />
+        </Routes>
       </main>
       {showPostProject && (
         <PostProject
