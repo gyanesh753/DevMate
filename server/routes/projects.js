@@ -2,17 +2,47 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/index');
 
-// GET all projects
+// GET all projects with optional filters
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM projects ORDER BY created_at DESC'
-    );
-    res.json(result.rows);
+    const { type, experience_level, is_remote, search } = req.query
+
+    let query = 'SELECT * FROM projects WHERE 1=1'
+    const params = []
+    let paramCount = 1
+
+    if (type && type !== 'all') {
+      query += ` AND type = $${paramCount}`
+      params.push(type)
+      paramCount++
+    }
+
+    if (experience_level && experience_level !== 'any') {
+      query += ` AND experience_level = $${paramCount}`
+      params.push(experience_level)
+      paramCount++
+    }
+
+    if (is_remote !== undefined && is_remote !== '') {
+      query += ` AND is_remote = $${paramCount}`
+      params.push(is_remote === 'true')
+      paramCount++
+    }
+
+    if (search) {
+      query += ` AND (title ILIKE $${paramCount} OR description ILIKE $${paramCount})`
+      params.push(`%${search}%`)
+      paramCount++
+    }
+
+    query += ' ORDER BY created_at DESC'
+
+    const result = await pool.query(query, params)
+    res.json(result.rows)
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message })
   }
-});
+})
 
 // GET single project by ID
 router.get('/:id', async (req, res) => {
