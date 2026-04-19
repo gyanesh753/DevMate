@@ -7,37 +7,29 @@ router.get('/', async (req, res) => {
   try {
     const { type, experience_level, is_remote, search } = req.query
 
-    let query = 'SELECT * FROM projects WHERE 1=1'
-    const params = []
-    let paramCount = 1
+    const typeVal = type && type !== 'all' ? type : null
+    const experienceVal =
+      experience_level && experience_level !== 'any' ? experience_level : null
+    const remoteVal =
+      is_remote !== undefined && is_remote !== ''
+        ? is_remote === 'true'
+        : null
+    const rawSearch = typeof search === 'string' ? search.trim() : ''
+    const searchVal = rawSearch.length > 0 ? rawSearch : null
 
-    if (type && type !== 'all') {
-      query += ` AND type = $${paramCount}`
-      params.push(type)
-      paramCount++
-    }
-
-    if (experience_level && experience_level !== 'any') {
-      query += ` AND experience_level = $${paramCount}`
-      params.push(experience_level)
-      paramCount++
-    }
-
-    if (is_remote !== undefined && is_remote !== '') {
-      query += ` AND is_remote = $${paramCount}`
-      params.push(is_remote === 'true')
-      paramCount++
-    }
-
-    if (search) {
-      query += ` AND (title ILIKE $${paramCount} OR description ILIKE $${paramCount})`
-      params.push(`%${search}%`)
-      paramCount++
-    }
-
-    query += ' ORDER BY created_at DESC'
-
-    const result = await pool.query(query, params)
+    const result = await pool.query(
+      `SELECT * FROM projects
+       WHERE ($1::text IS NULL OR type = $1)
+         AND ($2::text IS NULL OR experience_level = $2)
+         AND ($3::boolean IS NULL OR is_remote = $3)
+         AND (
+           $4::text IS NULL
+           OR title ILIKE ('%' || $4::text || '%')
+           OR description ILIKE ('%' || $4::text || '%')
+         )
+       ORDER BY created_at DESC`,
+      [typeVal, experienceVal, remoteVal, searchVal]
+    )
     res.json(result.rows)
   } catch (error) {
     res.status(500).json({ error: error.message })
