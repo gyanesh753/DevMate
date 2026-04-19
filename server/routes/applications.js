@@ -1,9 +1,24 @@
 const express = require('express')
+const rateLimit = require('express-rate-limit')
 const router = express.Router()
 const pool = require('../db/index')
 
+const applyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const listApplicationsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // POST apply to a project
-router.post('/', async (req, res) => {
+router.post('/', applyLimiter, async (req, res) => {
   try {
     const { project_id, applicant_id, message } = req.body
 
@@ -21,7 +36,7 @@ router.post('/', async (req, res) => {
 })
 
 // GET applications for a project
-router.get('/project/:project_id', async (req, res) => {
+router.get('/project/:project_id', listApplicationsLimiter, async (req, res) => {
   try {
     const { project_id } = req.params
     const result = await pool.query(
