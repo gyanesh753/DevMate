@@ -30,6 +30,12 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  console.error(err);
+  res.status(500).json({ error: err.message || 'Internal server error' });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

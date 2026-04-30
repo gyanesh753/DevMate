@@ -1,11 +1,15 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../db/index')
+const { requireAuth } = require('../middleware/auth')
 
-// GET user profile by ID
-router.get('/:id', async (req, res) => {
+// GET user profile by ID (own profile only)
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params
+    if (id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
     const result = await pool.query(
       'SELECT * FROM users WHERE id = $1',
       [id]
@@ -19,10 +23,13 @@ router.get('/:id', async (req, res) => {
   }
 })
 
-// PUT update user profile
-router.put('/:id', async (req, res) => {
+// PUT update user profile (own profile only)
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params
+    if (id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
     const { name, bio, location, github_url, linkedin_url, skills } = req.body
 
     const result = await pool.query(
@@ -37,6 +44,9 @@ router.put('/:id', async (req, res) => {
        RETURNING *`,
       [name, bio, location, github_url, linkedin_url, skills, id]
     )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
     res.json(result.rows[0])
   } catch (error) {
     res.status(500).json({ error: error.message })

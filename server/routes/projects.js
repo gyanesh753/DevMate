@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/index');
+const { requireAuth } = require('../middleware/auth');
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // GET all projects with optional filters
 router.get('/', async (req, res) => {
   try {
-    const { type, experience_level, is_remote, search } = req.query
+    const { type, experience_level, is_remote, search, owner_id } = req.query
 
     const typeVal = type && type !== 'all' ? type : null
     const experienceVal =
@@ -16,6 +20,9 @@ router.get('/', async (req, res) => {
         : null
     const rawSearch = typeof search === 'string' ? search.trim() : ''
     const searchVal = rawSearch.length > 0 ? rawSearch : null
+    const rawOwner =
+      typeof owner_id === 'string' ? owner_id.trim() : ''
+    const ownerVal = rawOwner.length > 0 && UUID_RE.test(rawOwner) ? rawOwner : null
 
     const result = await pool.query(
       `SELECT * FROM projects
@@ -27,8 +34,9 @@ router.get('/', async (req, res) => {
            OR title ILIKE ('%' || $4::text || '%')
            OR description ILIKE ('%' || $4::text || '%')
          )
+         AND ($5::uuid IS NULL OR owner_id = $5)
        ORDER BY created_at DESC`,
-      [typeVal, experienceVal, remoteVal, searchVal]
+      [typeVal, experienceVal, remoteVal, searchVal, ownerVal]
     )
     res.json(result.rows)
   } catch (error) {
@@ -57,20 +65,21 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create a new project
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const {
       title,
       description,
       type,
       skills_needed,
-      owner_id,
       experience_level,
       industry,
       is_remote,
       location,
       max_members
     } = req.body;
+
+    const owner_id = req.user.id;
 
     const result = await pool.query(
       `INSERT INTO projects 

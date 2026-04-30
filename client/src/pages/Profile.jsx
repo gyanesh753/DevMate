@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../Supabase'
 import { useNavigate } from 'react-router-dom'
+import { apiUrl, authHeaders } from '../lib/api'
 
 function Profile() {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [projects, setProjects] = useState([])
+  const [loadError, setLoadError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({
@@ -24,12 +26,19 @@ function Profile() {
 
   useEffect(() => {
     const loadProfile = async () => {
+      setLoadError(null)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { navigate('/'); return }
       setUser(user)
 
-      const res = await fetch(`http://localhost:5000/api/users/${user.id}`)
-      const data = await res.json()
+      const headers = await authHeaders()
+      const res = await fetch(apiUrl(`/api/users/${user.id}`), { headers })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setLoadError(data.error || 'Could not load profile')
+        setLoading(false)
+        return
+      }
       setProfile(data)
       setForm({
         name: data.name || '',
@@ -40,14 +49,20 @@ function Profile() {
         skills: data.skills || [],
       })
 
-      const projectsRes = await fetch(`http://localhost:5000/api/projects?owner_id=${user.id}`)
-      const projectsData = await projectsRes.json()
-      setProjects(projectsData)
+      const projectsRes = await fetch(
+        apiUrl(`/api/projects?owner_id=${encodeURIComponent(user.id)}`)
+      )
+      const projectsData = await projectsRes.json().catch(() => [])
+      if (!projectsRes.ok) {
+        setProjects([])
+      } else {
+        setProjects(Array.isArray(projectsData) ? projectsData : [])
+      }
 
       setLoading(false)
     }
     loadProfile()
-  }, [])
+  }, [navigate])
 
   const toggleSkill = (skill) => {
     setForm(prev => ({
@@ -60,18 +75,41 @@ function Profile() {
 
   const handleSave = async () => {
     setSaving(true)
-    await fetch(`http://localhost:5000/api/users/${user.id}`, {
+    const headers = await authHeaders()
+    const res = await fetch(apiUrl(`/api/users/${user.id}`), {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(form)
     })
+    const data = await res.json().catch(() => ({}))
     setSaving(false)
+    if (!res.ok) {
+      setLoadError(data.error || 'Could not save profile')
+      return
+    }
+    setLoadError(null)
+    setProfile(data)
     setSaved(true)
     setEditing(false)
     setTimeout(() => setSaved(false), 3000)
   }
 
   if (loading) return <div className="text-center text-gray-400 py-20">Loading profile...</div>
+
+  if (loadError && !profile) {
+    return (
+      <div className="max-w-xl mx-auto text-center py-20">
+        <p className="text-red-400 mb-4">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="text-blue-400 hover:text-blue-300 text-sm"
+        >
+          Back to home
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -80,7 +118,7 @@ function Profile() {
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 mb-6">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-white font-bold text-2xl">{profile.name}</h1>
+            <h1 className="text-white font-bold text-2xl">{profile?.name}</h1>
             <p className="text-gray-400 text-sm mt-1">{user.email}</p>
           </div>
           <button
@@ -166,17 +204,20 @@ function Profile() {
           </div>
         ) : (
           <div>
-            {profile.bio && <p className="text-gray-300 mb-4">{profile.bio}</p>}
-            {profile.location && <p className="text-gray-400 text-sm mb-3">📍 {profile.location}</p>}
+            {loadError && (
+              <p className="text-red-400 text-sm mb-3">{loadError}</p>
+            )}
+            {profile?.bio && <p className="text-gray-300 mb-4">{profile.bio}</p>}
+            {profile?.location && <p className="text-gray-400 text-sm mb-3">📍 {profile.location}</p>}
             <div className="flex gap-3 mb-4">
-              {profile.github_url && (
-                <a href={profile.github_url} target="_blank" className="text-blue-400 hover:text-blue-300 text-sm">GitHub →</a>
+              {profile?.github_url && (
+                <a href={profile.github_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">GitHub →</a>
               )}
-              {profile.linkedin_url && (
-                <a href={profile.linkedin_url} target="_blank" className="text-blue-400 hover:text-blue-300 text-sm">LinkedIn →</a>
+              {profile?.linkedin_url && (
+                <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">LinkedIn →</a>
               )}
             </div>
-            {profile.skills?.length > 0 && (
+            {profile?.skills?.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {profile.skills.map((skill, i) => (
                   <span key={i} className="bg-gray-800 text-gray-300 text-xs px-3 py-1.5 rounded-lg">{skill}</span>
