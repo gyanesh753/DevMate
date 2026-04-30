@@ -104,6 +104,26 @@ function ProjectDetail({ user, onSignInClick }) {
           {project.industry && <span>🏢 {project.industry}</span>}
         </div>
 
+        {/* Posted by */}
+        <div className="bg-gray-800 rounded-xl p-4 mb-6">
+          <p className="text-gray-400 text-sm mb-1">Posted by</p>
+          <p className="text-white font-medium">
+            {project.owner_name || 'Anonymous'}
+          </p>
+          <div className="flex gap-3 mt-2">
+            {project.github_url && (
+              <a href={project.github_url} target="_blank" className="text-blue-400 hover:text-blue-300 text-sm">
+                GitHub →
+              </a>
+            )}
+            {project.linkedin_url && (
+              <a href={project.linkedin_url} target="_blank" className="text-blue-400 hover:text-blue-300 text-sm">
+                LinkedIn →
+              </a>
+            )}
+          </div>
+        </div>
+
         {/* Description */}
         <div className="mb-6">
           <h2 className="text-white font-semibold mb-2">About this project</h2>

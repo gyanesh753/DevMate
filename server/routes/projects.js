@@ -41,7 +41,10 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      'SELECT * FROM projects WHERE id = $1',
+      `SELECT p.*, u.name as owner_name, u.github_url, u.linkedin_url
+       FROM projects p
+       LEFT JOIN users u ON p.owner_id = u.id
+       WHERE p.id = $1`,
       [id]
     );
     if (result.rows.length === 0) {

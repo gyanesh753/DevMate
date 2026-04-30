@@ -40,12 +40,14 @@ function PostProject({ onClose, onProjectPosted }) {
     setLoading(true)
     setError(null)
 
+    const { data: { user } } = await supabase.auth.getUser()
+
     const response = await fetch('http://localhost:5000/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...form,
-        owner_id: null
+        owner_id: user?.id || null
       })
     })
 

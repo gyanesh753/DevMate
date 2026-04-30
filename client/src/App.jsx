@@ -6,6 +6,7 @@ import Home from './pages/Home'
 import Auth from './pages/Auth'
 import PostProject from './pages/PostProject'
 import ProjectDetail from './pages/ProjectDetail'
+import Profile from './pages/Profile'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -42,6 +43,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home newProject={newProject} />} />
           <Route path="/projects/:id" element={<ProjectDetail user={user} onSignInClick={() => setShowAuth(true)} />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </main>
       {showPostProject && (
