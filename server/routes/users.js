@@ -1,10 +1,18 @@
 const express = require('express')
+const rateLimit = require('express-rate-limit')
 const router = express.Router()
 const pool = require('../db/index')
 const { requireAuth } = require('../middleware/auth')
 
+const userProfileLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // GET user profile by ID (own profile only)
-router.get('/:id', requireAuth, async (req, res) => {
+router.get('/:id', userProfileLimiter, requireAuth, async (req, res) => {
   try {
     const { id } = req.params
     if (id !== req.user.id) {
@@ -24,7 +32,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 })
 
 // PUT update user profile (own profile only)
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', userProfileLimiter, requireAuth, async (req, res) => {
   try {
     const { id } = req.params
     if (id !== req.user.id) {
