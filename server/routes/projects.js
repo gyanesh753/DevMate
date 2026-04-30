@@ -1,13 +1,28 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const pool = require('../db/index');
 const { requireAuth } = require('../middleware/auth');
+
+const projectReadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const createProjectLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // GET all projects with optional filters
-router.get('/', async (req, res) => {
+router.get('/', projectReadLimiter, async (req, res) => {
   try {
     const { type, experience_level, is_remote, search, owner_id } = req.query
 
@@ -45,7 +60,7 @@ router.get('/', async (req, res) => {
 })
 
 // GET single project by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', projectReadLimiter, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
@@ -65,7 +80,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create a new project
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', createProjectLimiter, requireAuth, async (req, res) => {
   try {
     const {
       title,
