@@ -2,6 +2,7 @@ const express = require('express')
 const rateLimit = require('express-rate-limit')
 const router = express.Router()
 const pool = require('../db/index')
+const { requireAuth } = require('../middleware/auth')
 
 const applyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -18,9 +19,10 @@ const listApplicationsLimiter = rateLimit({
 })
 
 // POST apply to a project
-router.post('/', applyLimiter, async (req, res) => {
+router.post('/', applyLimiter, requireAuth, async (req, res) => {
   try {
-    const { project_id, applicant_id, message } = req.body
+    const { project_id, message } = req.body
+    const applicant_id = req.user.id
 
     const result = await pool.query(
       `INSERT INTO applications (project_id, applicant_id, message)

@@ -1,12 +1,20 @@
 import { supabase } from '../Supabase'
+import { useNavigate } from 'react-router-dom'
 
 function Navbar({ user, onSignInClick, onPostProject }) {
+  const navigate = useNavigate()
+
   return (
     <nav className="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
-
+      
       {/* Logo */}
       <div className="flex items-center gap-2">
-        <span className="text-blue-500 font-bold text-2xl">DevMate</span>
+        <span 
+          onClick={() => navigate('/')}
+          className="text-blue-500 font-bold text-2xl cursor-pointer"
+        >
+          DevMate
+        </span>
         <span className="text-gray-400 text-sm hidden md:block">— Find your team, build your dream</span>
       </div>
 
@@ -26,9 +34,12 @@ function Navbar({ user, onSignInClick, onPostProject }) {
       <div className="flex items-center gap-3">
         {user ? (
           <>
-            <span className="text-gray-300 text-sm">
+            <button
+              onClick={() => navigate('/profile')}
+              className="text-gray-300 hover:text-white text-sm transition"
+            >
               {user.user_metadata?.name || user.email}
-            </span>
+            </button>
             <button
               onClick={onPostProject}
               className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg transition"

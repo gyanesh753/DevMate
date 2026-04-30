@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../Supabase'
+import { apiUrl, authHeaders } from '../lib/api'
 
 const SKILLS = ['React', 'Node.js', 'Python', 'PostgreSQL', 'MongoDB', 'TypeScript', 'JavaScript', 'Flutter', 'Swift', 'Figma', 'AWS', 'Docker']
 
@@ -40,13 +41,24 @@ function PostProject({ onClose, onProjectPosted }) {
     setLoading(true)
     setError(null)
 
-    const response = await fetch('http://localhost:5000/api/projects', {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setError('You must be signed in to post a project')
+      setLoading(false)
+      return
+    }
+
+    const headers = await authHeaders()
+    if (!headers.Authorization) {
+      setError('Session expired. Please sign in again.')
+      setLoading(false)
+      return
+    }
+
+    const response = await fetch(apiUrl('/api/projects'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        owner_id: null
-      })
+      headers,
+      body: JSON.stringify({ ...form })
     })
 
     const data = await response.json()

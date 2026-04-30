@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { apiUrl, authHeaders } from '../lib/api'
 
 function ProjectDetail({ user, onSignInClick }) {
   const { id } = useParams()
@@ -14,10 +15,15 @@ function ProjectDetail({ user, onSignInClick }) {
   const [applyError, setApplyError] = useState(null)
 
   useEffect(() => {
-    fetch(`http://localhost:5000/api/projects/${id}`)
-      .then(res => res.json())
-      .then(data => {
-        setProject(data)
+    fetch(apiUrl(`/api/projects/${id}`))
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setError(data.error || 'Failed to load project')
+          setProject(null)
+        } else {
+          setProject(data)
+        }
         setLoading(false)
       })
       .catch(() => {
@@ -35,15 +41,25 @@ function ProjectDetail({ user, onSignInClick }) {
   }
 
   const submitApplication = async () => {
+    if (!user?.id) {
+      onSignInClick()
+      return
+    }
     setApplying(true)
     setApplyError(null)
 
-    const response = await fetch('http://localhost:5000/api/applications', {
+    const headers = await authHeaders()
+    if (!headers.Authorization) {
+      setApplyError('Session expired. Please sign in again.')
+      setApplying(false)
+      return
+    }
+
+    const response = await fetch(apiUrl('/api/applications'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         project_id: id,
-        applicant_id: null,
         message
       })
     })
@@ -76,6 +92,10 @@ function ProjectDetail({ user, onSignInClick }) {
     <div className="text-center text-red-400 py-20">{error}</div>
   )
 
+  if (!project) return (
+    <div className="text-center text-gray-400 py-20">Project not found.</div>
+  )
+
   return (
     <div className="max-w-3xl mx-auto">
       
@@ -102,6 +122,26 @@ function ProjectDetail({ user, onSignInClick }) {
           <span>👥 Up to {project.max_members} members</span>
           <span>🎯 {project.experience_level} level</span>
           {project.industry && <span>🏢 {project.industry}</span>}
+        </div>
+
+        {/* Posted by */}
+        <div className="bg-gray-800 rounded-xl p-4 mb-6">
+          <p className="text-gray-400 text-sm mb-1">Posted by</p>
+          <p className="text-white font-medium">
+            {project.owner_name || 'Anonymous'}
+          </p>
+          <div className="flex gap-3 mt-2">
+            {project.github_url && (
+              <a href={project.github_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">
+                GitHub →
+              </a>
+            )}
+            {project.linkedin_url && (
+              <a href={project.linkedin_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">
+                LinkedIn →
+              </a>
+            )}
+          </div>
         </div>
 
         {/* Description */}
