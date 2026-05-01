@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import ProjectCard from '../components/ProjectCard'
+import { apiUrl } from '../lib/api'
 
 function Home({ newProject }) {
   const [projects, setProjects] = useState([])
@@ -19,7 +20,7 @@ function Home({ newProject }) {
     if (activeRemote !== '') params.append('is_remote', activeRemote)
     if (search) params.append('search', search)
 
-    fetch(`http://localhost:5000/api/projects?${params.toString()}`)
+      fetch(apiUrl(`/api/projects?${params.toString()}`))
       .then(res => res.json())
       .then(data => {
         setProjects(data)

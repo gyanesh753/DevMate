@@ -8,9 +8,14 @@ const applicationsRouter = require('./routes/applications');
 const usersRouter = require('./routes/users')
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+app.use(cors({ origin: allowedOrigins, credentials: false }));
 app.use(express.json());
 
 app.use('/api/projects', projectsRouter);
