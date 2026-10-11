@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = 'https://ojzryjcxobhzjnqehveh.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qenJ5amN4b2JoempucWVodmVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMzAzNjEsImV4cCI6MjA5MDkwNjM2MX0.NnD6gibPO45gdGMV2x56re3P_ht305m-MBPaZVlFmJw'
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const url = import.meta.env.VITE_SUPABASE_URL
+const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+export const configurationError =
+  !url || !key ? 'Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to start DevMate.' : null
+export const supabase = configurationError ? null : createClient(url, key)

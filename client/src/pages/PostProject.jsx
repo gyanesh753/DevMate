@@ -1,224 +1,189 @@
 import { useState } from 'react'
-import { supabase } from '../Supabase'
-import { apiUrl, authHeaders } from '../lib/api'
-
-const SKILLS = ['React', 'Node.js', 'Python', 'PostgreSQL', 'MongoDB', 'TypeScript', 'JavaScript', 'Flutter', 'Swift', 'Figma', 'AWS', 'Docker']
-
-function PostProject({ onClose, onProjectPosted }) {
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    type: 'passion',
-    skills_needed: [],
-    experience_level: 'any',
-    industry: '',
-    is_remote: true,
-    location: '',
-    max_members: 3
-  })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-
-  const handleChange = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }))
-  }
-
-  const toggleSkill = (skill) => {
-    setForm(prev => ({
-      ...prev,
-      skills_needed: prev.skills_needed.includes(skill)
-        ? prev.skills_needed.filter(s => s !== skill)
-        : [...prev.skills_needed, skill]
-    }))
-  }
-
-  const handleSubmit = async () => {
-    if (!form.title || !form.description) {
-      setError('Title and description are required')
-      return
-    }
-
-    setLoading(true)
+import { useNavigate, useParams } from 'react-router-dom'
+import { api } from '../lib/api'
+import { useResource } from '../hooks/useResource'
+import { ErrorNotice, Loading, SkillPicker } from '../components/UI'
+import { TYPES, LEVELS, LIMITS, projectSchema } from '../../../shared/validation'
+export function ProjectForm({ project, catalog, onSaved }) {
+  const [form, setForm] = useState(
+    project
+      ? {
+          title: project.title,
+          description: project.description,
+          type: project.type,
+          experience_level: project.experience_level,
+          industry: project.industry || '',
+          location: project.location || '',
+          is_remote: project.is_remote,
+          max_members: project.max_members,
+          skill_ids: project.skills.map((s) => s.id),
+        }
+      : {
+          title: '',
+          description: '',
+          type: 'passion',
+          experience_level: 'any',
+          industry: '',
+          location: '',
+          is_remote: true,
+          max_members: 3,
+          skill_ids: [],
+        },
+  )
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(null)
+  const change = (key, value) => setForm((f) => ({ ...f, [key]: value }))
+  async function submit(e) {
+    e.preventDefault()
     setError(null)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setError('You must be signed in to post a project')
-      setLoading(false)
+    const parsed = projectSchema.safeParse(form)
+    if (!parsed.success) {
+      setError(
+        new Error(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('. ')),
+      )
       return
     }
-
-    const headers = await authHeaders()
-    if (!headers.Authorization) {
-      setError('Session expired. Please sign in again.')
-      setLoading(false)
-      return
+    setBusy(true)
+    try {
+      const saved = await api(project ? `/api/projects/${project.id}` : '/api/projects', {
+        method: project ? 'PATCH' : 'POST',
+        body: { ...parsed.data, ...(project ? { version: project.version } : {}) },
+      })
+      onSaved(saved)
+    } catch (error) {
+      setError(error)
+    } finally {
+      setBusy(false)
     }
-
-    const response = await fetch(apiUrl('/api/projects'), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ ...form })
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      setError(data.error || 'Something went wrong')
-    } else {
-      onProjectPosted(data)
-      onClose()
-    }
-
-    setLoading(false)
   }
-
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-white font-semibold text-xl">Post a Project</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">✕</button>
-        </div>
-
-        {/* Title */}
-        <div className="mb-4">
-          <label className="text-gray-400 text-sm mb-1 block">Project Title *</label>
-          <input
-            type="text"
-            value={form.title}
-            onChange={e => handleChange('title', e.target.value)}
-            placeholder="e.g. AI-powered recipe app"
-            className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm outline-none border border-gray-700 focus:border-blue-500 transition"
-          />
-        </div>
-
-        {/* Description */}
-        <div className="mb-4">
-          <label className="text-gray-400 text-sm mb-1 block">Description *</label>
-          <textarea
-            value={form.description}
-            onChange={e => handleChange('description', e.target.value)}
-            placeholder="Describe your project, what you're building, and what kind of collaborators you're looking for..."
-            rows={4}
-            className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm outline-none border border-gray-700 focus:border-blue-500 transition resize-none"
-          />
-        </div>
-
-        {/* Type and Experience Level */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="text-gray-400 text-sm mb-1 block">Project Type</label>
-            <select
-              value={form.type}
-              onChange={e => handleChange('type', e.target.value)}
-              className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm outline-none border border-gray-700 focus:border-blue-500 transition"
-            >
-              <option value="passion">Passion</option>
-              <option value="paid">Paid</option>
-              <option value="open-source">Open Source</option>
-              <option value="hackathon">Hackathon</option>
-              <option value="startup">Startup</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-gray-400 text-sm mb-1 block">Experience Level</label>
-            <select
-              value={form.experience_level}
-              onChange={e => handleChange('experience_level', e.target.value)}
-              className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm outline-none border border-gray-700 focus:border-blue-500 transition"
-            >
-              <option value="any">Any</option>
-              <option value="fresher">Fresher</option>
-              <option value="mid">Mid</option>
-              <option value="senior">Senior</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Skills */}
-        <div className="mb-4">
-          <label className="text-gray-400 text-sm mb-2 block">Skills Needed</label>
-          <div className="flex flex-wrap gap-2">
-            {SKILLS.map(skill => (
-              <button
-                key={skill}
-                onClick={() => toggleSkill(skill)}
-                className={`px-3 py-1 rounded-full text-sm border transition ${
-                  form.skills_needed.includes(skill)
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'border-gray-700 text-gray-300 hover:border-blue-500'
-                }`}
-              >
-                {skill}
-              </button>
+    <form onSubmit={submit}>
+      <label>
+        Project title
+        <input
+          value={form.title}
+          onChange={(e) => change('title', e.target.value)}
+          required
+          maxLength={LIMITS.title}
+        />
+      </label>
+      <label>
+        Description
+        <textarea
+          value={form.description}
+          onChange={(e) => change('description', e.target.value)}
+          required
+          maxLength={LIMITS.description}
+          rows={6}
+        />
+      </label>
+      <div className="form-grid">
+        <label>
+          Project type
+          <select value={form.type} onChange={(e) => change('type', e.target.value)}>
+            {TYPES.map((v) => (
+              <option key={v}>{v}</option>
             ))}
-          </div>
-        </div>
-
-        {/* Industry */}
-        <div className="mb-4">
-          <label className="text-gray-400 text-sm mb-1 block">Industry</label>
-          <input
-            type="text"
-            value={form.industry}
-            onChange={e => handleChange('industry', e.target.value)}
-            placeholder="e.g. Healthcare, Fintech, Education"
-            className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm outline-none border border-gray-700 focus:border-blue-500 transition"
-          />
-        </div>
-
-        {/* Remote and Max Members */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="text-gray-400 text-sm mb-1 block">Location</label>
-            <select
-              value={form.is_remote}
-              onChange={e => handleChange('is_remote', e.target.value === 'true')}
-              className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm outline-none border border-gray-700 focus:border-blue-500 transition"
-            >
-              <option value="true">Remote</option>
-              <option value="false">In-Person</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-gray-400 text-sm mb-1 block">Max Members</label>
-            <input
-              type="number"
-              value={form.max_members}
-              onChange={e => handleChange('max_members', parseInt(e.target.value))}
-              min={2}
-              max={20}
-              className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm outline-none border border-gray-700 focus:border-blue-500 transition"
-            />
-          </div>
-        </div>
-
-        {/* Error */}
-        {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-
-        {/* Submit */}
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 border border-gray-700 text-gray-300 hover:text-white py-3 rounded-lg text-sm transition"
+          </select>
+        </label>
+        <label>
+          Experience level
+          <select
+            value={form.experience_level}
+            onChange={(e) => change('experience_level', e.target.value)}
           >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg text-sm font-medium transition disabled:opacity-50"
-          >
-            {loading ? 'Posting...' : 'Post Project'}
-          </button>
-        </div>
-
+            {LEVELS.map((v) => (
+              <option key={v}>{v}</option>
+            ))}
+          </select>
+        </label>
       </div>
-    </div>
+      <SkillPicker
+        catalog={catalog}
+        selected={form.skill_ids}
+        onChange={(ids) => change('skill_ids', ids)}
+      />
+      <label>
+        Industry
+        <input
+          value={form.industry}
+          onChange={(e) => change('industry', e.target.value)}
+          maxLength={120}
+        />
+      </label>
+      <div className="form-grid">
+        <label>
+          Work arrangement
+          <select
+            value={String(form.is_remote)}
+            onChange={(e) => change('is_remote', e.target.value === 'true')}
+          >
+            <option value="true">Remote</option>
+            <option value="false">In person</option>
+          </select>
+        </label>
+        <label>
+          Total team capacity (including you)
+          <input
+            type="number"
+            min={2}
+            max={20}
+            required
+            disabled={project && project.status !== 'open'}
+            value={Number.isNaN(form.max_members) ? '' : form.max_members}
+            onChange={(e) => change('max_members', e.target.valueAsNumber)}
+          />
+        </label>
+      </div>
+      {!form.is_remote && (
+        <label>
+          Location
+          <input
+            required
+            value={form.location}
+            onChange={(e) => change('location', e.target.value)}
+            maxLength={LIMITS.location}
+          />
+        </label>
+      )}
+      <ErrorNotice error={error} />
+      <button className="primary" disabled={busy}>
+        {busy ? 'Saving…' : project ? 'Save changes' : 'Post project'}
+      </button>
+    </form>
   )
 }
-
-export default PostProject
+export default function PostProject({ user }) {
+  const { id } = useParams(),
+    navigate = useNavigate()
+  const catalog = useResource('/api/skills'),
+    project = useResource(id ? `/api/projects/${id}` : null, user.id)
+  if (catalog.loading || project.loading) return <Loading />
+  if (catalog.error || project.error)
+    return (
+      <ErrorNotice
+        error={catalog.error || project.error}
+        retry={() => {
+          catalog.reload()
+          project.reload()
+        }}
+      />
+    )
+  if (
+    id &&
+    (project.data.owner_id !== user.id || !['open', 'in-progress'].includes(project.data.status))
+  )
+    return <ErrorNotice error="You cannot edit this project." />
+  return (
+    <section className="card editor">
+      <h1>{id ? 'Edit project' : 'Post a project'}</h1>
+      <p className="muted">Tell your future teammates what you want to build.</p>
+      <ProjectForm
+        key={id || 'new'}
+        project={project.data}
+        catalog={catalog.data}
+        onSaved={(p) => navigate(`/projects/${p.id}`)}
+      />
+    </section>
+  )
+}

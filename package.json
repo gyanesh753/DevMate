@@ -1,0 +1,49 @@
+{
+  "name": "devmate",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "engines": {
+    "node": ">=22.14.0 <27"
+  },
+  "scripts": {
+    "dev:api": "npm run dev -w server",
+    "dev:web": "npm run dev -w client",
+    "build": "npm run build -w client",
+    "lint": "eslint server shared tests scripts && npm run lint -w client",
+    "test": "vitest run",
+    "test:integration": "node --test --test-concurrency=1 tests/api.test.js",
+    "test:e2e": "playwright test",
+    "db:test": "supabase test db",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local",
+    "test:migrations": "node --test tests/migrations.test.js",
+    "setup:local": "node scripts/local-env.js",
+    "test:queries": "node --test tests/queries.test.js",
+    "format:check": "prettier --check 'server/**/*.js' 'shared/**/*.js' 'tests/**/*.js' 'scripts/*.js' 'client/src/**/*.{js,jsx}'"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@playwright/test": "1.64.0",
+    "@supabase/supabase-js": "2.103.3",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.1",
+    "dotenv": "17.4.0",
+    "eslint": "9.39.4",
+    "globals": "17.4.0",
+    "jsdom": "27.0.1",
+    "pg": "8.20.0",
+    "prettier": "3.6.2",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "supabase": "2.120.0",
+    "supertest": "7.3.1",
+    "vitest": "5.0.3"
+  }
+}
