@@ -5,21 +5,20 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "node --env-file-if-exists=.env.local --watch index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.1",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.0",
-    "express": "^5.2.1",
-    "express-rate-limit": "^7.5.0",
-    "pg": "^8.20.0"
+    "@supabase/supabase-js": "2.103.3",
+    "cors": "2.8.6",
+    "dotenv": "17.4.0",
+    "express": "5.2.1",
+    "express-rate-limit": "7.5.0",
+    "pg": "8.20.0",
+    "helmet": "8.1.0"
   },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
-  }
+  "devDependencies": {}
 }

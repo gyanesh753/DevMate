@@ -1,212 +1,185 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { apiUrl, authHeaders } from '../lib/api'
-
-function ProjectDetail({ user, onSignInClick }) {
-  const { id } = useParams()
-  const navigate = useNavigate()
-  const [project, setProject] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [showApplyForm, setShowApplyForm] = useState(false)
-  const [message, setMessage] = useState('')
-  const [applying, setApplying] = useState(false)
-  const [applied, setApplied] = useState(false)
-  const [applyError, setApplyError] = useState(null)
-
-  useEffect(() => {
-    fetch(apiUrl(`/api/projects/${id}`))
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          setError(data.error || 'Failed to load project')
-          setProject(null)
-        } else {
-          setProject(data)
-        }
-        setLoading(false)
-      })
-      .catch(() => {
-        setError('Failed to load project')
-        setLoading(false)
-      })
-  }, [id])
-
-  const handleApply = async () => {
-    if (!user) {
-      onSignInClick()
-      return
+import { useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { api } from '../lib/api'
+import { useResource } from '../hooks/useResource'
+import { ErrorNotice, Loading, Status, Confirm } from '../components/UI'
+export default function ProjectDetail({ user }) {
+  const { id } = useParams(),
+    [params] = useSearchParams(),
+    navigate = useNavigate()
+  const { data: project, loading, error, reload } = useResource(`/api/projects/${id}`, user?.id)
+  const [message, setMessage] = useState(''),
+    [busy, setBusy] = useState(false),
+    [mutationError, setMutationError] = useState(null),
+    [confirmation, setConfirmation] = useState(null)
+  async function apply(e) {
+    e.preventDefault()
+    setBusy(true)
+    setMutationError(null)
+    try {
+      await api('/api/applications', { method: 'POST', body: { project_id: id, message } })
+      setMessage('')
+      reload()
+    } catch (error) {
+      setMutationError(error)
+      if (error.status === 409) reload()
+    } finally {
+      setBusy(false)
     }
-    setShowApplyForm(true)
   }
-
-  const submitApplication = async () => {
-    if (!user?.id) {
-      onSignInClick()
-      return
-    }
-    setApplying(true)
-    setApplyError(null)
-
-    const headers = await authHeaders()
-    if (!headers.Authorization) {
-      setApplyError('Session expired. Please sign in again.')
-      setApplying(false)
-      return
-    }
-
-    const response = await fetch(apiUrl('/api/applications'), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        project_id: id,
-        message
+  async function transition() {
+    setBusy(true)
+    setMutationError(null)
+    try {
+      await api(`/api/projects/${id}/status`, {
+        method: 'PATCH',
+        body: { status: confirmation, version: project.version },
       })
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      setApplyError(data.error || 'Something went wrong')
-    } else {
-      setApplied(true)
-      setShowApplyForm(false)
+      setConfirmation(null)
+      reload()
+    } catch (error) {
+      setMutationError(error)
+    } finally {
+      setBusy(false)
     }
-
-    setApplying(false)
   }
-
-  const typeColors = {
-    passion: 'bg-purple-900 text-purple-300',
-    paid: 'bg-green-900 text-green-300',
-    'open-source': 'bg-blue-900 text-blue-300',
-    hackathon: 'bg-orange-900 text-orange-300',
-    startup: 'bg-red-900 text-red-300',
-  }
-
-  if (loading) return (
-    <div className="text-center text-gray-400 py-20">Loading project...</div>
-  )
-
-  if (error) return (
-    <div className="text-center text-red-400 py-20">{error}</div>
-  )
-
-  if (!project) return (
-    <div className="text-center text-gray-400 py-20">Project not found.</div>
-  )
-
+  if (loading) return <Loading />
+  if (error) return <ErrorNotice error={error} retry={reload} />
+  const owned = user?.id === project.owner_id,
+    full = project.member_count >= project.max_members
   return (
-    <div className="max-w-3xl mx-auto">
-      
-      {/* Back button */}
-      <button
-        onClick={() => navigate('/')}
-        className="text-gray-400 hover:text-white text-sm mb-6 flex items-center gap-2 transition"
-      >
-        ← Back to Feed
-      </button>
-
-      {/* Project Header */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 mb-6">
-        <div className="flex items-start justify-between mb-4">
-          <h1 className="text-white font-bold text-3xl">{project.title}</h1>
-          <span className={`text-sm px-3 py-1 rounded-full font-medium ${typeColors[project.type] || 'bg-gray-800 text-gray-300'}`}>
-            {project.type}
-          </span>
+    <div className="detail">
+      <Link to="/">← Browse projects</Link>
+      <article className="card">
+        <div className="actions spread">
+          <span className="eyebrow">{project.type}</span>
+          <Status value={project.status} />
         </div>
-
-        {/* Meta info */}
-        <div className="flex flex-wrap gap-4 text-sm text-gray-400 mb-6">
-          <span>📍 {project.is_remote ? 'Remote' : project.location}</span>
-          <span>👥 Up to {project.max_members} members</span>
-          <span>🎯 {project.experience_level} level</span>
-          {project.industry && <span>🏢 {project.industry}</span>}
+        <h1>{project.title}</h1>
+        <p className="meta">
+          {project.is_remote ? 'Remote' : project.location} · {project.experience_level} experience
+          · {project.member_count}/{project.max_members} total members
+        </p>
+        <p className="description">{project.description}</p>
+        <div className="skills">
+          {project.skills.map((s) => (
+            <span className="badge" key={s.id}>
+              {s.name}
+            </span>
+          ))}
         </div>
-
-        {/* Posted by */}
-        <div className="bg-gray-800 rounded-xl p-4 mb-6">
-          <p className="text-gray-400 text-sm mb-1">Posted by</p>
-          <p className="text-white font-medium">
-            {project.owner_name || 'Anonymous'}
-          </p>
-          <div className="flex gap-3 mt-2">
-            {project.github_url && (
-              <a href={project.github_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">
-                GitHub →
-              </a>
-            )}
-            {project.linkedin_url && (
-              <a href={project.linkedin_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">
-                LinkedIn →
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* Description */}
-        <div className="mb-6">
-          <h2 className="text-white font-semibold mb-2">About this project</h2>
-          <p className="text-gray-400 leading-relaxed">{project.description}</p>
-        </div>
-
-        {/* Skills */}
-        <div className="mb-8">
-          <h2 className="text-white font-semibold mb-3">Skills Needed</h2>
-          <div className="flex flex-wrap gap-2">
-            {project.skills_needed?.map((skill, index) => (
-              <span key={index} className="bg-gray-800 text-gray-300 text-sm px-3 py-1.5 rounded-lg">
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Apply section */}
-        {applied ? (
-          <div className="bg-green-900/30 border border-green-700 rounded-xl p-4 text-center">
-            <p className="text-green-400 font-medium">✅ Application submitted successfully!</p>
-            <p className="text-gray-400 text-sm mt-1">The project owner will review your application.</p>
-          </div>
-        ) : showApplyForm ? (
-          <div className="bg-gray-800 rounded-xl p-4">
-            <h3 className="text-white font-medium mb-3">Why do you want to collaborate?</h3>
-            <textarea
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              placeholder="Tell the project owner about yourself and why you're a good fit..."
-              rows={4}
-              className="w-full bg-gray-900 text-white rounded-lg px-4 py-3 text-sm outline-none border border-gray-700 focus:border-blue-500 transition resize-none mb-3"
-            />
-            {applyError && <p className="text-red-400 text-sm mb-3">{applyError}</p>}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowApplyForm(false)}
-                className="flex-1 border border-gray-700 text-gray-300 py-2 rounded-lg text-sm transition hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={submitApplication}
-                disabled={applying}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium transition disabled:opacity-50"
-              >
-                {applying ? 'Submitting...' : 'Submit Application'}
-              </button>
+        {project.industry && <p className="muted">Industry: {project.industry}</p>}
+        <h2>Your potential team</h2>
+        <ul className="team">
+          {project.members.map((m) => (
+            <li key={m.user_id}>
+              <strong>{m.name}</strong> <span className="muted">{m.role}</span>
+              {m.github_url && (
+                <a href={m.github_url} target="_blank" rel="noopener noreferrer">
+                  GitHub
+                </a>
+              )}
+              {m.linkedin_url && (
+                <a href={m.linkedin_url} target="_blank" rel="noopener noreferrer">
+                  LinkedIn
+                </a>
+              )}
+            </li>
+          ))}
+        </ul>
+        {owned ? (
+          <section>
+            <h2>Manage project</h2>
+            <div className="actions">
+              <Link className="button" to={`/projects/${id}/applications`}>
+                Review applications
+              </Link>
+              {['open', 'in-progress'].includes(project.status) && (
+                <Link className="button" to={`/projects/${id}/edit`}>
+                  Edit project
+                </Link>
+              )}
+              {project.status === 'open' && (
+                <button onClick={() => setConfirmation('in-progress')}>Start project</button>
+              )}
+              {project.status === 'in-progress' && (
+                <button onClick={() => setConfirmation('completed')}>Mark completed</button>
+              )}
+              {['open', 'in-progress'].includes(project.status) && (
+                <button onClick={() => setConfirmation('closed')}>Close project</button>
+              )}
             </div>
-          </div>
-        ) : (
+          </section>
+        ) : project.my_application ? (
+          <section className="notice" role="status">
+            <h2>Your application</h2>
+            <Status value={project.my_application.status} />
+            <p>
+              {project.my_application.status === 'closed'
+                ? 'Recruitment ended before a decision was made.'
+                : project.my_application.status === 'pending'
+                  ? 'The owner will review your application.'
+                  : 'The owner has made a final decision.'}
+            </p>
+            <Link to="/applications">View my applications</Link>
+          </section>
+        ) : project.status !== 'open' || full ? (
+          <p className="notice">
+            {full && project.status === 'open'
+              ? 'This team is full.'
+              : 'This project is no longer recruiting.'}
+          </p>
+        ) : !user ? (
           <button
-            onClick={handleApply}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-medium transition"
+            className="primary"
+            onClick={() =>
+              navigate(`/auth?returnTo=${encodeURIComponent(`/projects/${id}?apply=1`)}`)
+            }
           >
-            Apply to Collaborate
+            Sign in to apply
           </button>
+        ) : (
+          <section id="apply">
+            <h2>Apply to collaborate</h2>
+            <form onSubmit={apply}>
+              <label>
+                Why would you like to join?
+                <textarea
+                  autoFocus={params.get('apply') === '1'}
+                  rows={4}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  required
+                  minLength={1}
+                  maxLength={2000}
+                  placeholder="Introduce yourself and tell the owner how you can contribute."
+                />
+              </label>
+              <button className="primary" disabled={busy}>
+                {busy ? 'Submitting…' : 'Submit application'}
+              </button>
+            </form>
+          </section>
         )}
-      </div>
-
+        {!confirmation && <ErrorNotice error={mutationError} />}
+      </article>
+      {confirmation && (
+        <Confirm
+          title={`Set project to ${confirmation}?`}
+          busy={busy}
+          onClose={() => {
+            setConfirmation(null)
+            setMutationError(null)
+          }}
+          onConfirm={transition}
+        >
+          <p>
+            This change is final. Pending applications will close when recruitment ends. Existing
+            decisions and team membership are preserved.
+          </p>
+          <ErrorNotice error={mutationError} />
+        </Confirm>
+      )}
     </div>
   )
 }
-
-export default ProjectDetail
